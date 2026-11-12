@@ -110,10 +110,12 @@ function render(q = ''){
 }
 
 const BASE = 'https://thorherramientasclaypole.github.io/catalogo/';
+// Código corto y fijo para cada producto (sale del nombre, no cambia si se reordena la planilla)
+function pid(n){ let h = 2166136261; for (const ch of n) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); }
 function shareText(p){
-  return `*${p.n}*\n💲 ${fmt(p.p)} (precio directo)\n📍 Retiro en Claypole – González 3741\n` +
-    (WHATSAPP ? `🛒 Pedilo por WhatsApp: https://wa.me/${WHATSAPP}?text=${encodeURIComponent('Hola! Me interesa: ' + p.n + ' (' + fmt(p.p) + ')')}\n` : '') +
-    `🔗 Ver en el catálogo: ${BASE}?q=${encodeURIComponent(p.n)}\nThor Herramientas`;
+  return `${p.n}\n💲 ${fmt(p.p)} (precio directo)\n📍 Retiro en Claypole – González 3741\n` +
+    (WHATSAPP ? `🛒 Pedilo por WhatsApp: https://wa.me/${WHATSAPP}\n` : '') +
+    `🔗 ${BASE}?p=${pid(p.n)}`;
 }
 
 function toast(msg){
@@ -161,7 +163,9 @@ fetch(CSV_URL + (CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now())
     P = parseCSV(t).slice(1)
       .map(r => ({n: (r[0]||'').trim(), p: parseInt(String(r[1]||'').trim().replace(/[.,]\d{1,2}$/, '').replace(/\D/g, ''), 10), img: (r[2]||'').trim()}))
       .filter(x => x.n && x.p > 0);
-    const q0 = new URLSearchParams(location.search).get('q') || '';
+    const u = new URLSearchParams(location.search), sp = u.get('p');
+    const hit = sp && P.find(x => pid(x.n) === sp);
+    const q0 = hit ? hit.n : (u.get('q') || '');
     if (q0) document.getElementById('q').value = q0;
     render(q0);
   })
