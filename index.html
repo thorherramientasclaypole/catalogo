@@ -38,6 +38,9 @@ main{max-width:1100px;margin:16px auto;padding:0 16px}
 .btn{flex:1;border:0;border-radius:8px;padding:10px 6px;font-weight:800;font-size:13px;cursor:pointer;text-decoration:none;text-align:center}
 .wa{background:var(--wa);color:#fff}
 .sh{background:var(--k);color:var(--y);padding:8px 6px}
+.cp{background:#e9e7df;color:var(--k);padding:8px 6px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,40px);max-width:min(92vw,420px);background:var(--k);color:#fff;font-size:14px;line-height:1.4;padding:12px 16px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:.25s;z-index:20}
+#toast.on{opacity:1;transform:translate(-50%,0)}
 .msg{padding:40px 16px;text-align:center;color:var(--mut)}
 footer{text-align:center;font-size:13px;color:var(--mut);padding:24px 16px;line-height:1.6}
 </style>
@@ -52,6 +55,7 @@ footer{text-align:center;font-size:13px;color:var(--mut);padding:24px 16px;line-
   <p class="info" id="info">Cargando productos…</p>
   <div class="grid" id="grid"></div>
 </main>
+<div id="toast" role="status"></div>
 <footer>📍 González 3741, Claypole · Lunes a sábado de 9 a 18 h<br>Precios de venta directa, sujetos a stock.</footer>
 
 <script>
@@ -100,12 +104,39 @@ function render(q = ''){
       <div class="btns">
         ${WHATSAPP ? `<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${WHATSAPP}?text=${encodeURIComponent('Hola! Me interesa: ' + p.n + ' (' + fmt(p.p) + ')')}">Pedir por WhatsApp</a>` : ''}
         <button class="btn ${WHATSAPP ? 'sh' : 'wa'}" data-i="${P.indexOf(p)}">${WHATSAPP ? 'Compartir' : 'Enviar por WhatsApp'}</button>
+        <button class="btn cp" data-c="${P.indexOf(p)}">📋 Copiar texto</button>
       </div>
     </div></div>`).join('');
 }
 
+const BASE = 'https://thorherramientasclaypole.github.io/catalogo/';
+function shareText(p){
+  return `*${p.n}*\n💲 ${fmt(p.p)} (precio directo)\n📍 Retiro en Claypole – González 3741\n` +
+    (WHATSAPP ? `🛒 Pedilo por WhatsApp: https://wa.me/${WHATSAPP}?text=${encodeURIComponent('Hola! Me interesa: ' + p.n + ' (' + fmt(p.p) + ')')}\n` : '') +
+    `🔗 Ver en el catálogo: ${BASE}?q=${encodeURIComponent(p.n)}\nThor Herramientas`;
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 4500);
+}
+
+async function copyText(text){
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch(e){
+    const a = document.createElement('textarea'); a.value = text; document.body.appendChild(a);
+    a.select(); let ok = false; try { ok = document.execCommand('copy'); } catch(_){}
+    a.remove(); return ok;
+  }
+}
+
 async function share(p){
-  const text = `*${p.n}*\n💲 ${fmt(p.p)} (precio directo)\n📍 Retiro en Claypole – González 3741\nThor Herramientas`;
+  const text = shareText(p);
+  // Copiamos el texto antes de compartir: Messenger e Instagram solo toman la foto,
+  // así que después se pega el texto en el chat.
+  const copied = await copyText(text);
+  if (copied) toast('Texto copiado ✅ Si la app solo manda la foto (Messenger), mantené apretado en el chat y tocá "Pegar".');
   try {
     if (p.img && navigator.canShare){
       const blob = await (await fetch(p.img)).blob();
@@ -117,7 +148,11 @@ async function share(p){
   window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
 }
 
-grid.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) share(P[+b.dataset.i]); });
+grid.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-i]'); if (b) return share(P[+b.dataset.i]);
+  const c = e.target.closest('button[data-c]');
+  if (c) toast(await copyText(shareText(P[+c.dataset.c])) ? 'Texto copiado ✅ Pegalo en el chat (mantené apretado → Pegar).' : 'No se pudo copiar. Probá de nuevo.');
+});
 document.getElementById('q').addEventListener('input', e => render(e.target.value));
 
 fetch(CSV_URL + (CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now())
@@ -126,7 +161,9 @@ fetch(CSV_URL + (CSV_URL.includes('?') ? '&' : '?') + 't=' + Date.now())
     P = parseCSV(t).slice(1)
       .map(r => ({n: (r[0]||'').trim(), p: parseInt(String(r[1]||'').trim().replace(/[.,]\d{1,2}$/, '').replace(/\D/g, ''), 10), img: (r[2]||'').trim()}))
       .filter(x => x.n && x.p > 0);
-    render();
+    const q0 = new URLSearchParams(location.search).get('q') || '';
+    if (q0) document.getElementById('q').value = q0;
+    render(q0);
   })
   .catch(() => { info.textContent = ''; grid.innerHTML = '<p class="msg">No se pudo cargar el catálogo. Probá de nuevo en un rato.</p>'; });
 </script>
