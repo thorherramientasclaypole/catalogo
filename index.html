@@ -105,7 +105,6 @@ function render(q = ''){
         ${WHATSAPP ? `<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${WHATSAPP}?text=${encodeURIComponent('Hola! Me interesa: ' + p.n + ' (' + fmt(p.p) + ')')}">Pedir por WhatsApp</a>` : ''}
         <button class="btn ${WHATSAPP ? 'sh' : 'wa'}" data-i="${P.indexOf(p)}">${WHATSAPP ? 'Compartir' : 'Enviar por WhatsApp'}</button>
         <button class="btn cp" data-c="${P.indexOf(p)}">📋 Copiar texto</button>
-        <button class="btn cp" data-c="${P.indexOf(p)}" data-mk="1">🛍️ Copiar p/ Marketplace</button>
       </div>
     </div></div>`).join('');
 }
@@ -113,10 +112,12 @@ function render(q = ''){
 const BASE = 'https://thorherramientasclaypole.github.io/catalogo/';
 // Código corto y fijo para cada producto (sale del nombre, no cambia si se reordena la planilla)
 function pid(n){ let h = 2166136261; for (const ch of n) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); }
-function shareText(p, mk){
+// sinWa = true: texto para "Compartir", sin el número ni el link de WhatsApp
+// (el botón "Pedir por WhatsApp" ya está en la página del enlace).
+function shareText(p, sinWa){
   return `${p.n}\n💲 ${fmt(p.p)} (precio directo)\n📍 Retiro en Claypole – González 3741\n` +
-    (WHATSAPP && !mk ? `🛒 Pedilo por WhatsApp: https://wa.me/${WHATSAPP}\n` : '') +
-    (mk ? '🛒 Pedilo acá: ' : '🔗 ') + `${BASE}?p=${pid(p.n)}`;
+    (WHATSAPP && !sinWa ? `🛒 Pedilo por WhatsApp: https://wa.me/${WHATSAPP}\n` : '') +
+    `🔗 ${BASE}?p=${pid(p.n)}`;
 }
 
 function toast(msg){
@@ -135,7 +136,7 @@ async function copyText(text){
 }
 
 async function share(p){
-  const text = shareText(p);
+  const text = shareText(p, true);
   // Copiamos el texto antes de compartir: Messenger e Instagram solo toman la foto,
   // así que después se pega el texto en el chat.
   const copied = await copyText(text);
@@ -154,7 +155,7 @@ async function share(p){
 grid.addEventListener('click', async e => {
   const b = e.target.closest('button[data-i]'); if (b) return share(P[+b.dataset.i]);
   const c = e.target.closest('button[data-c]');
-  if (c) toast(await copyText(shareText(P[+c.dataset.c], c.dataset.mk)) ? 'Texto copiado ✅ Pegalo en el chat (mantené apretado → Pegar).' : 'No se pudo copiar. Probá de nuevo.');
+  if (c) toast(await copyText(shareText(P[+c.dataset.c])) ? 'Texto copiado ✅ Pegalo en el chat (mantené apretado → Pegar).' : 'No se pudo copiar. Probá de nuevo.');
 });
 document.getElementById('q').addEventListener('input', e => render(e.target.value));
 
